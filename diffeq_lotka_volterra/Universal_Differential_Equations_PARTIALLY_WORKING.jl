@@ -1,9 +1,14 @@
 
+# Whether all modules are loaded correctly apparently depends on the order they are loaded. WHY? 
+# If I shift-enter 10 lines at a time, I sometimes get some failures. Is there any way for the wrong
+# order to be prevented via compiler analysis? 
 using OrdinaryDiffEq
+using DifferentialEquations
 using ModelingToolkit  # for @variables
 using DataDrivenDiffEq
-using DiffEqSensitivity, Optim
 using LinearAlgebra
+using DiffEqSensitivity
+using Optim
 using DiffEqFlux, Flux
 using Plots
 gr()
@@ -24,11 +29,11 @@ function lotka!(du, u, p, t)
 end
 
 # Define the experimental parameter
-tspan = (0.0f0,30.0f0)
-
+tspan = (0.0f0,3.0f0)
 u0 = Float32[0.44249296,4.6280594]
-p_ = Float32[1.3, 0.9, 0.8, 1.8]
+p_ = p_LV = Float32[1.3, 0.9, 0.8, 1.8]
 prob = ODEProblem(lotka!, u0,tspan, p_)
+# () on Vern7 is necessary
 solution = solve(prob, Vern7(), abstol=1e-12, reltol=1e-12, saveat = 0.1)
 
 # Ideal data
@@ -45,31 +50,55 @@ if 1 == 0
     plot(solution, alpha = 0.75, color = :black, label = ["True Data" nothing])
     scatter!(t, transpose(Xₙ), color = :red, label = ["Noisy Data" nothing])
 end
+
 ## ------------------ Define the UDE problem ---------------------------
 # Gaussian RBF as activation
 rbf(x) = exp.(-(x.^2))  # Why? 
 
+# Try the networks with different sizes, different depths, and different activation functions 
+# Activation functions to try: rbf, tanh, relu, elu, sigmoid
+
 # Define the network 2->5->5->5->2
 # DiffEqFlux.FastChain (more efficient than Chain for smaller networks)
+layer_size = 
+nb_inner_layers = 2
+#=
+inner_layers = []
+for i in 1:nb_inner_layers
+    push!(inner_layers, FastDense(layer_size, layer_size, rbf))
+end
+
 U = FastChain(
-    FastDense(2,5,rbf), FastDense(5,5, rbf), FastDense(5,5, rbf), FastDense(5,2)
+        FastDense(2,layer_size,rbf), 
+        inner_layers...,
+        FastDense(layer_size,2)
 )
+=#
+
+#= =#
+U = FastChain(
+    FastDense(2, layer_size, rbf), 
+    FastDense(layer_size, layer_size, rbf), 
+    FastDense(layer_size, layer_size, rbf), 
+    FastDense(layer_size,2)
+)
+#= =#
 # Get the initial parameters
-p = initial_params(U)
+p = p_NN = initial_params(U)
 
 # Define the hybrid model
-function ude_dynamics!(du,u, p, t, p_true)
+function ude_dynamics!(du,u, p, t, p_LV, U)
     û = U(u, p) # Network prediction
-    du[1] = p_true[1]*u[1] + û[1]
-    du[2] = -p_true[4]*u[2] + û[2]
+    du[1] = p_LV[1]*u[1] + û[1]
+    du[2] = -p_LV[4]*u[2] + û[2]
 end
 
 # Closure with the known parameter
-nn_dynamics!(du,u,p,t) = ude_dynamics!(du,u,p,t,p_)
+nn_dynamics!(du,u,p,t) = ude_dynamics!(du,u,p,t,p_NN, U)
 # Define the problem
 prob_nn = ODEProblem(nn_dynamics!,Xₙ[:, 1], tspan, p)
 
-#----
+#=----
 function predict(θ, X = Xₙ[:,1], T = t, scheme)
     Array(solve(prob_nn, scheme(), u0 = X, p=θ,
                 tspan = (T[1], T[end]), saveat = T,
@@ -77,6 +106,7 @@ function predict(θ, X = Xₙ[:,1], T = t, scheme)
                 sensealg = DiffEqFlux.ForwardDiffSensitivity()
                 ))
 end
+=#
 
 ## Function to train the network
 # Define a predictor (NODE) -------------------------
@@ -125,10 +155,12 @@ pl_losses = plot(1:200, losses[1:200], yaxis = :log10, xaxis = :log10, xlabel = 
 plot!(201:length(losses), losses[201:end], yaxis = :log10, xaxis = :log10, xlabel = "Iterations", ylabel = "Loss", label = "BFGS", color = :red)
 # savefig(pl_losses, joinpath(pwd(), "plots", "$(svname)_losses.pdf"))
 # Rename the best candidate
+# where does minimizer come from? 
 p_trained = res2.minimizer
 
 ## Analysis of the trained network
 # Plot the data and the approximation
+# Predict u[1], u[2]  (solution at all times)
 X̂ = predict(p_trained, Xₙ[:,1], t[1]:0.05f0:t[end])
 # Trained on noisy data vs real solution
 pl_trajectory = plot(t[1]:0.05f0:t[end], transpose(X̂), xlabel = "t", ylabel ="x(t), y(t)", color = :red, label = ["UDE Approximation" nothing])
@@ -148,11 +180,12 @@ scatter!(t, transpose(Xₙ), color = :black, label = ["Measurements" nothing])
 # scatter!(t, transpose(sol_nn_oz))
 ##
 
-# Ideal unknown interactions of the predictor
-Ȳ = [-p_[2]*(X̂[1,:].*X̂[2,:])';p_[3]*(X̂[1,:].*X̂[2,:])']
-# Neural network guess
-Ŷ = U(X̂,p_trained)
+# Ideal unknown interactions of the predictor (modelled portion of PDE)
+Ȳ = [-p_[2]*(X̂[1,:].*X̂[2,:])' ; p_[3]*(X̂[1,:].*X̂[2,:])']
+# Neural network guess (modelled terms in ODE)
+Ŷ = U(X̂, p_trained)
 
+# Error is farily large, reaching almost 1 ( solution of 4-7)
 pl_reconstruction = plot(t[1]:0.05f0:t[end], transpose(Ŷ), xlabel = "t", ylabel ="U(x,y)", color = :red, label = ["UDE Approximation" nothing])
 plot!(t[1]:0.05f0:t[end], transpose(Ȳ), color = :black, label = ["True Interaction" nothing])
 # savefig(pl_reconstruction, joinpath(pwd(), "plots", "$(svname)_missingterm_reconstruction.pdf"))
