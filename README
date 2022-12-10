@@ -1,0 +1,13 @@
+Author: G. Erlebacher
+Given the exact solution to the parametrized circle: 
+
+    dx/dt = -y
+	dy/dt = x
+
+Replace the RHS by a neural network that will approximate the time derivatives. To achieve this, a linear
+network is sufficient. So one layer, and no activation function. 
+
+I will create the exact solution over one period, and see if the neural network can extrapolate the solution. 
+It probably can since the equations are linear. 
+
+

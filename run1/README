@@ -1,0 +1,19 @@
+Training data: 200 pts, (x[0],x[1]) on a single trajectory for t in [0, 2*pi], 400 epochs
+Time step: dt: 0.01
+Validation: 500 iterations many points with dt = 0.01 and 0.05.  I am solving: 
+  dx/dt, dy/dt = NN(x,y)
+Method: Euler Method
+
+
+Time range of training: t \in [0,2*pi]
+Time range of validation: t \in [0, 25]
+
+Results: I get oscillatory behavior to t=25. Sometimes with fixed amplitude (correct), sometimes with growing amplitude, 
+   sometimes with decaying amplitude. A pure Euler method would have decaying amplitude due to numerical dissipation, 
+   unless dt is too large in which case, the system is violently unstable. 
+
+I could probably get better results, if I was solving: 
+   dx/dt, dy/dt = (x,y) \odot*NN  (Hadamard multiplication: element by element multiplication). \odot is circle with a dot in Latex.
+
+Given that I am using a Tanh as an activation function, I would get better results if my radius were limited to unity or less. 
+----------------------------------------------------------------------
