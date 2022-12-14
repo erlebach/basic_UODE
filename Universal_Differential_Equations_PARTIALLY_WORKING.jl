@@ -40,7 +40,6 @@ solution = solve(prob, Vern7(), abstol=1e-12, reltol=1e-12, saveat = 0.1)
 # Ideal data
 X = Array(solution)
 t = solution.t
-
 plot(X')
 
 # Add noise in terms of the mean (Statistics.jl)

@@ -1,0 +1,14 @@
+{
+        "dss_instances": {
+                "designInstance": {
+                                 "url": "http://localhost:11200/home/", 
+                                 "api_key": "xxxxxxxxxxxxxxxxxxx",
+                },
+				"no_check_certificate":true,
+                "productionInstance": {
+                                 "url": "http://localhost:11200/home/", 
+                                 "api_key": "xxxxxxxxxxxxxxxx",
+                }
+        },
+        "default_instance": "designInstance"
+}

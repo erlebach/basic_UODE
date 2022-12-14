@@ -1,4 +1,4 @@
-using Flux, DiffEqFlux
+using DiffEqFlux
 using DifferentialEquations, Optimization, OptimizationOptimJL, Random, Plots
 # Potential others required: Optimizers.jl, Zygote.jl
 using Optimisers
@@ -17,10 +17,10 @@ datasize = 30
 tspan = (0.0f0, 7.0f0)
 tsteps = range(tspan[1], tspan[2], length = datasize)
 
-function trueODEfunc(du, u, p, t)
-    true_A = [-0.1 2.0; -2.0 -0.1]
-    du .= ((u.^3)'true_A)'
-end
+# function trueODEfunc(du, u, p, t)
+#     true_A = [-0.1 2.0; -2.0 -0.1]
+#     du .= ((u.^3)'true_A)'
+# end
 
 """
 du/dt = A u + f(u)
@@ -39,19 +39,22 @@ function lotka_volterra!(du, u, p, t)
   return du
 end
 
-# u = [α*🐇, -δ*🐺]
-
-function circleODEfunc(du, u, p, t)
-    du[1] = -u[2]
-    du[2] =  u[1]
-    return du
+function lotka_volterra_NN!(du, u, p, t, NN)
+  #=
+     NN: output of a in-2 ==> out-2 neural network
+     return: estimate of time derivative at time tⁿ
+  =#
+  🐇, 🐺 = u    # solution at time tⁿ
+  α, β, γ, δ = p 
+  du[1] = d🐇 = α*🐇 + NN₁
+  du[2] = d🐺 = NN₂ - δ*🐺
+  return du
 end
 
 p = [1.5, 1., 3., 1.]
 
-# ODEfunc = trueODEfunc
-# ODEfunc = circleODEfunc
 ODEfunc = lotka_volterra!
+NODEfunc(du, u, p, t) = lotka_volterra_NN!(du, u, p, t, model)
 
 #α, β, γ, δ = p  # accessing named tuple (WHY?)
 β = 1.
@@ -59,7 +62,9 @@ ODEfunc = lotka_volterra!
 
 prob_trueode = ODEProblem(ODEfunc, u0, tspan)
 ode_data = Array(solve(prob_trueode, Tsit5(), saveat = tsteps))
+
 dense = Lux.Dense
+chain = Lux.Chain
 
 ##### 
 # Use Lux.BranchLayer(x)  (pass x to each layer
@@ -72,45 +77,28 @@ dense = Lux.Dense
 #dudt2 = Lux.Chain(x -> x.^3,
 n = 30
 
-# Custom layer is necessary to model the linear part of the equation
-struct LuxLinear5 <: Lux.AbstractExplicitLayer
-  β::Float64
-  γ::Float64
+# Lux model to handle the nonlinear term in the Lotka-Volterra equations
+layer_size = 5
+act = Lux.tanh
+
+function construct_model()
+  model = chain(dense(2, layer_size, act),
+              dense(layer_size, layer_size, act),
+              dense(layer_size, layer_size, act),
+              dense(layer_size, 2))
+    return model
 end
 
-# LuxLinear = LuxLinear5
+model = construct_model()
+rng = Random.default_rng()
+Random.seed!(rng, 0)
+# ps are parameters
+# st are state (frozen)
+ps, st = Lux.setup(rng, model)
 
-function LuxLinear5(a::Float32, b::Float32)
-  println("hello")
-  return LuxLinear5(() -> copy(a), () -> copy(b))
-end
-
-lin_layer = LuxLinear5(β, γ)
-Lux.initialstates(rng::AbstractRNG, layer::LuxLinear5) = (β=layer.β,γ=layer.γ)
-Lux.initialparameters(rng::AbstractRNG, layer::LuxLinear4) = ()
-
-# define layer
-(l::LuxLinear5)(x, st) = (-st.β * x[1], st.γ * x[2])
-
-mmm = LuxLinear5(0.3, 0.4)
-function construct_model(n, dense)
-  # α, β, γ, δ = p 
-  # println("beta: ", β)
-  β = 1.
-  γ = 3.
-  # y1 = x[1]
-  # y2 = x[2]
-  layer1 = Lux.Chain(dense(2, n, tanh), dense(n, 2))
-  # layer2 = Lux.Chain(x -> x)  # x -> [-x[2], x[1]]
-  # Once compiled, I cannot change definitions? HOW TO DEBUG? 
-  layer2 = Lux.Chain(LuxLinear4((β,γ)]))  
-  return Lux.PairwiseFusion(+; layer1, layer2)  # + does not work with sequence
-end
-
-dudt2 = construct_model(n, Lux.Dense)
+dudt2 = model
 
 # Output parameters and status
-p, st = Lux.setup(rng, dudt2)
 prob_neuralode = NeuralODE(dudt2, tspan, Tsit5(), saveat = tsteps)
 
 function predict_neuralode(p)

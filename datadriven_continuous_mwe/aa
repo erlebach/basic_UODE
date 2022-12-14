@@ -1,0 +1,135 @@
+A very useful function that I found at
+https://github.com/JuliaLang/julia/issues/24741
+------------------------
+
+function subtypetree(t, level=1, indent=4)
+    level == 1 && println(t)
+    for s in subtypes(t)
+      println(join(fill(" ", level * indent)) * string(s))
+      subtypetree(s, level+1, indent)
+    end
+end
+-------------------------------------------------------------------------
+
+subtypetree(AbstractVector{Real}) <<<
+AbstractVector{Real}
+    AbstractAlgebra.Generic.Partition{Real}
+    AbstractRange{Real}
+        LinRange{Real}
+        OrdinalRange{Real}
+            AbstractUnitRange{Real}
+                UnitRange{Real}
+            MutableArithmetics.MutatingStepRange{Real}
+            StepRange{Real}
+        StepRangeLen{Real}
+    ArrayInterface.AbstractArray2{Real, 1}
+    BangBang.NoBang.SingletonVector{Real}
+    Base.LogicalIndex{Real}
+    Base.ReinterpretArray{Real, 1, S} where S
+    Base.ReshapedArray{Real, 1}
+    Core.Compiler.AbstractRange{Real}
+        Core.Compiler.LinRange{Real}
+        Core.Compiler.OrdinalRange{Real}
+            Core.Compiler.AbstractUnitRange{Real}
+                Core.Compiler.UnitRange{Real}
+            Core.Compiler.StepRange{Real}
+        Core.Compiler.StepRangeLen{Real}
+    DataInterpolations.AbstractInterpolation{FT, Real} where FT
+        BSplineApprox{uType, tType, pType, kType, cType, FT, Real} where {uType, tType, pType, kType, cType, FT}
+        BSplineInterpolation{uType, tType, pType, kType, cType, FT, Real} where {uType, tType, pType, kType, cType, FT}
+        ConstantInterpolation{uType, tType, dirType, FT, Real} where {uType, tType, dirType, FT}
+        CubicSpline{uType, tType, hType, zType, FT, Real} where {uType, tType, hType, zType, FT}
+        DataInterpolations.AkimaInterpolation{uType, tType, bType, cType, dType, FT, Real} where {uType, tType, bType, cType, dType, FT}
+        DataInterpolations.CurvefitCache{uType, tType, mType, p0Type, ubType, lbType, algType, pminType, FT, Real} where {uType, tType, mType, p0Type, ubType, lbType, algType, pminType, FT}
+        DataInterpolations.RegularizationSmooth{uType, tType, FT, Real} where {uType, tType, FT}
+        LagrangeInterpolation{uType, tType, FT, Real} where {uType, tType, FT}
+        LinearInterpolation{uType, tType, FT, Real} where {uType, tType, FT}
+        QuadraticInterpolation{uType, tType, FT, Real} where {uType, tType, FT}
+        QuadraticSpline{uType, tType, tAType, dType, zType, FT, Real} where {uType, tType, tAType, dType, zType, FT}
+    DataStructures.CircularBuffer{Real}
+    DenseVector{Real}
+        Base.CodeUnits{Real}
+        Base.Experimental.Const{Real, 1}
+        GPUArraysCore.AbstractGPUVector{Real}
+        LabelledArrays.LArray{Real, 1, D} where D<:AbstractVector{Real}
+        Random.UnsafeView{Real}
+        SharedArrays.SharedVector{Real}
+        StrideArraysCore.AbstractStrideArray{Real, 1, R, S, X, O} where {R, S<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}, X<:Tuple{Union{Nothing, Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt, StrideArraysCore.StrideReset}}, O<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}}
+            StrideArraysCore.AbstractPtrStrideArray{Real, 1, R, S, X, O} where {R, S<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}, X<:Tuple{Union{Nothing, Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt, StrideArraysCore.StrideReset}}, O<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}}
+                StrideArraysCore.AbstractPtrArray{Real, 1, R, S, X, O} where {R, S<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}, X<:Tuple{Union{Nothing, Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt, StrideArraysCore.StrideReset}}, O<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}}
+            StrideArraysCore.AbstractStrideArrayImpl{Real, 1, R, S, X, O} where {R, S<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}, X<:Tuple{Union{Nothing, Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt, StrideArraysCore.StrideReset}}, O<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}}
+            StrideArraysCore.StaticStrideArray{Real, 1, R, S, X, O} where {R, S<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}, X<:Tuple{Union{Nothing, Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt, StrideArraysCore.StrideReset}}, O<:Tuple{Union{Int128, Int16, Int32, Int64, Int8, UInt128, UInt16, UInt32, UInt64, UInt8, Static.StaticInt}}}
+        Vector{Real}
+    Distributions.EachVariate{V, P, A, Real, 1} where {V, P, A}
+    FillArrays.AbstractFill{Real, 1}
+        FillArrays.Fill{Real, 1}
+        FillArrays.Ones{Real, 1}
+        FillArrays.Zeros{Real, 1}
+    ForwardDiff.Partials{N, Real} where N
+    Graphs.TransactionalVector{Real}
+    JumpProcesses.ExtendedJumpArray{Real, T1, T} where {T1, T<:AbstractArray{Real, T1}}
+    LabelledArrays.PrintWrapper{Real, 1, F, X} where {F, X<:AbstractVector{Real}}
+    MicroCollections.AbstractMicroVector{Real}
+        MicroCollections.AbstractEmptyVector{Real}
+            MicroCollections.EmptyVector{Real}
+        MicroCollections.AbstractSingletonVector{Real}
+            MicroCollections.SingletonVector{Real}
+    MicroCollections.OneHotVector{Real}
+    MicroCollections.UndefVector{Real}
+    ModelingToolkit.BipartiteGraphs.Matching{Real}
+    OffsetArrays.OffsetVector{Real, AA} where AA<:AbstractVector{Real}
+    PermutedDimsArray{Real, 1}
+    RecursiveArrayTools.AbstractVectorOfArray{Real, 1}
+        RecursiveArrayTools.AbstractDiffEqArray{Real, 1}
+            RecursiveArrayTools.DiffEqArray{Real, 1}
+            SciMLBase.AbstractNoiseProcess{Real, 1}
+            SciMLBase.AbstractTimeseriesSolution{Real, 1}
+                SciMLBase.AbstractAnalyticalSolution{Real, 1}
+                SciMLBase.AbstractODESolution{Real, 1}
+                    SciMLBase.AbstractDAESolution{Real, 1}
+                        SciMLBase.DAESolution{Real, 1}
+                    SciMLBase.AbstractDDESolution{Real, 1}
+                    SciMLBase.AbstractRODESolution{Real, 1}
+                        SciMLBase.RODESolution{Real, 1}
+                    SciMLBase.ODESolution{Real, 1}
+                SciMLBase.AbstractPDETimeSeriesSolution{Real, 1}
+                    SciMLBase.PDETimeSeriesSolution{Real, 1}
+                SciMLBase.AbstractSensitivitySolution{Real, 1}
+        RecursiveArrayTools.VectorOfArray{Real, 1}
+        SciMLBase.AbstractEnsembleSolution{Real, 1}
+            SciMLBase.EnsembleSolution{Real, 1}
+            SciMLBase.EnsembleSummary{Real, 1}
+            SciMLBase.EnsembleTestSolution{Real, 1}
+    RecursiveArrayTools.ArrayPartition{Real}
+    SciMLBase.AbstractNoTimeSolution{Real, 1}
+        SciMLBase.AbstractIntegralSolution{Real, 1}
+            SciMLBase.IntegralSolution{Real, 1}
+        SciMLBase.AbstractLinearSolution{Real, 1}
+            SciMLBase.LinearSolution{Real, 1}
+        SciMLBase.AbstractNonlinearSolution{Real, 1}
+            SciMLBase.NonlinearSolution{Real, 1}
+        SciMLBase.AbstractOptimizationSolution{Real, 1}
+            SciMLBase.OptimizationSolution{Real, 1}
+        SciMLBase.AbstractPDENoTimeSolution{Real, 1}
+            SciMLBase.PDENoTimeSolution{Real, 1}
+    SparseArrays.AbstractSparseVector{Real}
+        ModelingToolkit.CLILVector{Real}
+        SparseArrays.SparseVector{Real}
+    StaticArrays.TrivialView{A, Real, 1} where A
+    StaticArraysCore.StaticArray{S, Real, 1} where S<:Tuple
+        LabelledArrays.SLArray{S, Real, 1} where S<:Tuple
+        StaticArraysCore.FieldArray{N, Real, 1} where N<:Tuple
+            StaticArraysCore.FieldVector{N, Real} where N
+        StaticArraysCore.MArray{S, Real, 1} where S<:Tuple
+        StaticArraysCore.SArray{S, Real, 1} where S<:Tuple
+        Union{StaticArraysCore.SizedArray{S, Real, 1, M, TData} where {M, TData<:AbstractArray{Real, M}}, StaticArraysCore.SizedArray{S, Real, 1, M, TData} where {M, TData<:AbstractArray{Real, M}}} where S<:Tuple
+    StatsBase.AbstractWeights{S, Real, V} where {S<:Real, V<:AbstractVector{Real}}
+        StatsBase.AnalyticWeights{S, Real, V} where {S<:Real, V<:AbstractVector{Real}}
+        StatsBase.FrequencyWeights{S, Real, V} where {S<:Real, V<:AbstractVector{Real}}
+        StatsBase.ProbabilityWeights{S, Real, V} where {S<:Real, V<:AbstractVector{Real}}
+        StatsBase.UnitWeights{Real}
+        StatsBase.Weights{S, Real, V} where {S<:Real, V<:AbstractVector{Real}}
+    SubArray{Real, 1}
+    Symbolics.Arr{Real, 1}
+    Test.GenericArray{Real, 1}
+    VSCodeServer.JSON.Parser.PushVector{Real, A} where A<:AbstractVector{Real}

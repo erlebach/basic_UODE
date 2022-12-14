@@ -2,15 +2,21 @@
 # Whether all modules are loaded correctly apparently depends on the order they are loaded. WHY? 
 # If I shift-enter 10 lines at a time, I sometimes get some failures. Is there any way for the wrong
 # order to be prevented via compiler analysis? 
-using OrdinaryDiffEq
+#using OrdinaryDiffEq
 using DifferentialEquations
 using ModelingToolkit  # for @variables
 using DataDrivenDiffEq
 using DataDrivenSparse
 using LinearAlgebra
-using DiffEqSensitivity
-using Optim
-using DiffEqFlux, Flux
+using SciMLSensitivity #<<<
+using Optimization #<<<
+using OptimizationOptimisers #<<<
+using OptimizationOptimJL #<<<
+using ComponentArrays #<<<
+#using DiffEqSensitivity
+#using Optim
+# using DiffEqFlux
+using Lux
 using Plots
 gr()
 using Statistics
@@ -29,25 +35,34 @@ function lotka!(du, u, p, t)
     return du
 end
 
-# Define the experimental parameter
-tspan = (0.0f0,3.0f0)
-u0 = Float32[0.44249296,4.6280594]
-p_ = p_LV = Float32[1.3, 0.9, 0.8, 1.8]
-prob = ODEProblem(lotka!, u0,tspan, p_)
-# () on Vern7 is necessary
-solution = solve(prob, Vern7(), abstol=1e-12, reltol=1e-12, saveat = 0.1)
+#p_ = p_LV = Float32.([1.3, 0.9, 0.8, 1.8])
+p_ = p_LV = [1.3, 0.9, 0.8, 1.8]
+tspan = (0.0f0,3.0f0)  # must be a tuple (works as a list outside function, not inside)
+u0 = Float32.([0.44249296,4.6280594])
+u0 = [0.44249296,4.6280594]
+saveat=0.1
 
+function generate_solution_ode(system_odes, u0, tspan, p_; saveat=0.1)
+    prob = ODEProblem(system_odes, u0,tspan, p_)
+	# make sure error tolerances are not set too low. If they are too low, the 
+	# integration might complete early. 
+    solution = solve(prob, Vern7(), abstol=1e-7, reltol=1e-4, saveat=0.1)
+    return solution
+end
+
+solution = generate_solution_ode(lotka!, u0, tspan, p_LV)
 # Ideal data
 X = Array(solution)
 t = solution.t
-
 plot(X')
 
-# Add noise in terms of the mean (Statistics.jl)
+# Add noise in terms of the mean (Statistics.jl). In this way, less noise is added
+# if the mean is lower
 x̄ = mean(X, dims = 2)
 noise_magnitude = Float32(5e-2)
 Xₙ = X .+ (noise_magnitude*x̄) .* randn(eltype(X), size(X))
 
+# Turn plotting of noisy solution on/off.
 if 1 == 0
     plot(solution, alpha = 0.75, color = :black, label = ["True Data" nothing])
     scatter!(t, transpose(Xₙ), color = :red, label = ["Noisy Data" nothing])
@@ -62,8 +77,6 @@ rbf(x) = exp.(-(x.^2))  # Why?
 
 # Define the network 2->5->5->5->2
 # DiffEqFlux.FastChain (more efficient than Chain for smaller networks)
-layer_size = 5
-nb_inner_layers = 2
 #=
 inner_layers = []
 for i in 1:nb_inner_layers
@@ -79,17 +92,24 @@ U = FastChain(
 
 #= =#
 
-act = rbf
+# Set a random seed for reproduceable behaviour
+rng = Random.default_rng()
+Random.seed!(1234)
 
-U = FastChain(
-    FastDense(2, layer_size, act), 
-    FastDense(layer_size, layer_size, act), 
-    FastDense(layer_size, layer_size, act), 
-    FastDense(layer_size,2)
-)
-#= =#
-# Get the initial parameters
-p = p_NN = initial_params(U)
+function create_model(act, rng; layer_size=5)
+    FastDense = Lux.Dense
+    U = Lux.Chain(
+        FastDense(2, layer_size, act), 
+        FastDense(layer_size, layer_size, act), 
+        FastDense(layer_size, layer_size, act), 
+        FastDense(layer_size,2))
+    p, st = Lux.setup(rng, U)
+    return U, p, st
+end
+
+layer_size = 5
+nb_inner_layers = 2
+U, p_NN, st = create_model(rbf, rng; layer_size=layer_size)
 
 # Define the hybrid model
 function ude_dynamics!(du,u, p, t, p_LV, U)
@@ -101,7 +121,8 @@ end
 # Closure with the known parameter
 nn_dynamics!(du,u,p,t) = ude_dynamics!(du,u,p,t,p_NN, U)
 # Define the problem
-prob_nn = ODEProblem(nn_dynamics!,Xₙ[:, 1], tspan, p)
+# 2nd argument are initial conditions
+prob_nn = ODEProblem(nn_dynamics!,Xₙ[:, 1], tspan, p_LV)
 
 #=----
 function predict(θ, X = Xₙ[:,1], T = t, scheme)
@@ -115,8 +136,10 @@ end
 
 ## Function to train the network
 # Define a predictor (NODE) -------------------------
+# QUESTION: why no semi-colon? 
 function predict(θ, X = Xₙ[:,1], T = t)
-    Array(solve(prob_nn, Vern7(), u0 = X, p=θ,
+    _prob = remake(prob_nn, u0=X, tspan=(T[1],T[end]), p=θ)
+    Array(solve(_prob, Vern7(), u0 = X, p=θ,
                 tspan = (T[1], T[end]), saveat = T,
                 abstol=1e-6, reltol=1e-6,
                 sensealg = DiffEqFlux.ForwardDiffSensitivity()
@@ -130,23 +153,28 @@ function loss(θ)
 end
 
 # Container to track the losses
-losses = Float32[]  # Code crashes without this line (in sciml_train: losses not defined)
+losses = Float64[]  # Code crashes without this line (in sciml_train: losses not defined)
 
 # Callback to show the loss during training
-callback(θ,l) = begin
+callback = function(θ,l) 
     push!(losses, l)
     if length(losses)%50==0
         println("Current loss after $(length(losses)) iterations: $(losses[end])")
     end
-    false
+    return false
 end
 
 ## Training ------------------------------
 :wait
 # First train with ADAM for better convergence -> move the parameters into a
 # favourable starting positing for BFGS
+adtype = Optimization.AutoZygote()
+# @which  OptimizationProblem is in SciMLBase (why not in Optimization?)
+optf = Optimization.OptimizationFunction((x,p) -> loss(x), adtype)
+optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p_NN))
 println("before 1st Diffeqflux, length(losses): ", length(losses))
-res1 = DiffEqFlux.sciml_train(loss, p, ADAM(0.1f0), cb=callback, maxiters = 200)
+# res1 = DiffEqFlux.sciml_train(loss, p, ADAM(0.1f0), cb=callback, maxiters = 200)
+res1 = Optimization.solve(optprob, ADAM(0.1), callback=callback, maxiters=200)
 println("Training loss after $(length(losses)) iterations: $(losses[end])")
 # Train with BFGS
 println("before 2nd Diffeqflux, length(losses): ", length(losses))

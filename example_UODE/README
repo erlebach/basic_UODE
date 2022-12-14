@@ -1,0 +1,5 @@
+Julia 1.8.3, 2022-12-11
+Tutorial demo found at 
+Demonstrates a simple NeuralODE using Lux, DifferentialEquations.jl, Optimization.jl, DiffeqFlux
+
+It is not clear what files are required from each library. 
