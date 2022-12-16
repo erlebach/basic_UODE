@@ -249,15 +249,15 @@ full_res = solve(full_problem, basis, opt, maxiter = 10000, progress = true)
 # What is the difference between full_problem, ideal_problem, and nn_problem? 
 # non-noisy, noisy, nn search?
 ideal_res = solve(ideal_problem, basis, opt, maxiter = 10000, progress = true)
-# DataSampler and Batcher not found
-#nn_res = solve(nn_problem, basis, opt, maxiter = 10000, progress = true, sampler = DataSampler(Batcher(n = 4, shuffle = true)))
-nn_res = solve(nn_problem, basis, opt, maxiter = 10000, progress = true)
+sampler = DataProcessing(split = 0.8, shuffle = true, batchsize = 30, rng = rng)
+nn_res = solve(nn_problem, basis, opt, maxiter=10, progress=true, data_processing=sampler, digits=1)
+
 # Store the results
 results = [full_res; ideal_res; nn_res]
 #------------------------------------------------------------------------
 # Show the results
 map(println, results)
-# Show the results
+# Show the results  (??? result not defined)
 map(println ∘ result, results)
 # Show the identified parameters
 map(println ∘ parameter_map, results)
@@ -269,8 +269,8 @@ function recovered_dynamics!(du,u, p, t)
   du[2] = -p_[4]*u[2] + û[2]
 end
 
-estimation_prob = ODEProblem(recovered_dynamics!, u0_LV, tspan, parameters(nn_res))
-estimate = solve(estimation_prob, Vern7(), saveat = solution.t)
+estimation_prob = ODEProblem(recovered_dynamics!, u0, tspan, parameters(nn_res))
+estimate = solve(estimation_prob, Tsit5(), saveat = solution.t)
 
 # Plot
 plot(solution)
