@@ -1,3 +1,4 @@
 {
-    "julia.executablePath": "/Applications/Julia-1.8.app/Contents/Resources/julia/bin/julia"
+    "julia.executablePath": "/Applications/Julia-1.8.app/Contents/Resources/julia/bin/julia",
+    "julia.environmentPath": "/Users/erlebach/src/2022/basic_UODE/yyy/GordonPackage.jl"
 }
