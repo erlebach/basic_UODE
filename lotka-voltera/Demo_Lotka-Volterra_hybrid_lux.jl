@@ -15,13 +15,16 @@ gr()
 # Set a random seed for reproducible behaviour
 rng = StableRNG(1111)
 ##-----------------------------------------------------------------------
-# Generating the Training Data
+# G p_enerating the Training Data
 # First, let's generate training data from the Lotka-Volterra equations. This is straightforward and standard DifferentialEquations.jl usage. Our sample data is thus generated as follows:
 
 function lotka!(du, u, p, t)
   α, β, γ, δ = p
-  du[1] = α*u[1] - β*u[2]*u[1]
-  du[2] = γ*u[1]*u[2]  - δ*u[2]
+  du[1] = α*u[1]          - β*u[2]*u[1]
+  du[2] = γ*u[1]*u[2]     - δ*u[2]
+  #α, β, γ, δ = p_true
+  #du[1] = α*u[1] + û[1]
+  #du[2] = -γ*u[2] + û[2]
 end
 
 # Define the experimental parameter
@@ -30,7 +33,7 @@ u0 = 5f0 * rand(rng, 2)
 p_ = [1.3, 0.9, 0.8, 1.8]
 prob = ODEProblem(lotka!, u0,tspan, p_)
 # Using tolerances of 1.e-12 not a great idea if saaving at maany times steps
-solution = solve(prob, Vern7(), abstol=1e-12, reltol=1e-12, saveat = 0.25)
+solution = solve(prob, Vern7(), abstol=1e-7, reltol=1e-7, saveat = 0.25)
 
 # Add noise in terms of the mean
 X = Array(solution)
@@ -91,11 +94,12 @@ println(prob_nn)
    To update the parameters, we'd do p = .... The field names can be acquired from the 
    problem documentation (or the docstrings!).
 =#
+
 function predict(θ, X = Xₙ[:,1], T = t)
     _prob = remake(prob_nn, u0 = X, tspan = (T[1], T[end]), p = θ)
     Array(solve(_prob, Vern7(), saveat = T,
-                abstol=1e-6, reltol=1e-6,
-                ))
+                abstol=1e-6, reltol=1e-7,
+    ))
 end
 ##-----------------------------------------------------------------------
 ##-----------------------------------------------------------------------
@@ -156,7 +160,7 @@ of the second optimization, and run it with BFGS. This looks like:
 =#
 optprob2 = Optimization.OptimizationProblem(optf, res1.u)
 res2 = Optimization.solve(optprob2, Optim.LBFGS(), callback=callback, maxiters = 1000)
-println("Final training loss after $(length(losses)) iterations: $(losses[end])")
+ComponentVectoprintln("Final training loss after $(length(losses)) iterations: $(losses[end])")
 
 # Rename the best candidate
 p_trained = res2.u
@@ -286,7 +290,7 @@ println(nn_res)
 for eqs in (full_eqs, ideal_eqs, nn_eqs)
   println(eqs)
   println(get_parameter_map(eqs))
-  println()
+  println("---------------------------------------")
 end
 ##-----------------------------------------------------------------------
 # Next, we want to predict with our model. To do so, we embedd the basis into 

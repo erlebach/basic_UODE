@@ -12,6 +12,9 @@
 /source-dist.tmp
 /source-dist.tmp1
 
+*.aux
+*.bbl
+*.
 *.exe
 *.dll
 *.dwo
