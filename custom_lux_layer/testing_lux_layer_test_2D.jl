@@ -39,8 +39,12 @@ Random.seed!(rng, 0)
 # u1, u2 are the input to the neural network. 
 function generate_data_2D(N)
     # Polynomial: P(x,y) = x^3 + 0.5 x y^2 - 2. y x^2 - (1.5 x) + .3
-    x = range(-2.f0, 2.f0, N) |> collect 
-    y = range(-2.f0, 2.f0, N) |> collect 
+    # I think my problem is the poor choice of x and y. So let us take random numbers beteween -2 and 2 for both.
+    # x and y ∈ [-2.,2.]
+    x = -2.f0 .+ rand(N) .* 4. |> collect
+    y = -2.f0 .+ rand(N) .* 4. |> collect
+    # x = range(-2.f0, 2.f0, N) |> collect 
+    # y = range(-2.f0, 2.f0, N) |> collect 
     z = zeros(2, N)
     # Coefficients: 1 x y x^2 xy y^2 x^3 (x^2 y) (x y^2) y^3
     #p = (a00=0.3, a10=-1.5, a01=0., a20=0., a11=0., a02=0.5,
@@ -48,12 +52,15 @@ function generate_data_2D(N)
     #p = ComponentArray(p)
     @. z[1,:] = .3 - 1.5 * x - 2. * x^2 * y + 0.5 * x * y^2 + x^3
     @. z[2,:] =  x^2 - 2. * y^2  + 1.5
+
+#    @. z[1,:] = .3  + 2. * x - 3. * y
+#    @. z[2,:] =  -2. - x + 5. * y
     println("generate_data_2D, z= ",  size(z))
     # x,y: (1,N), z: (2,N)
     return x, y, z
 end
 
-N = 128
+N = 256
 x_data, y_data, z_data = generate_data_2D(N)
 
 model = Polylayer(; out_dims=2, degree=3, init_weight=Lux.zeros32)
@@ -78,9 +85,12 @@ plot!(z_data[2,:])
 zz = model(xy, ps, st)[1]
 
 function loss_function(model, ps, st, x_data, y_data, z_data, epoch)
+    # x_data and y_data are 1D Vectors
+    # println("loss,size x_data: ", size(x_data))  # 1D
+    # println("loss,size z_data: ", size(z_data))  # 2D
     xy = hcat(x_data, y_data)   |> transpose# 
     z_pred, _ = model(xy, ps, st)  # Model should return size (model.out_dims, N). Update global st
-    mse_loss = mean(abs2, z_pred - z_data)     # mutated data?
+    mse_loss  = mean(abs2, z_pred - z_data)     # mutated data?
     # induce sparsity
     lambda = .001
     mse_loss = mse_loss + lambda * norm(ps, 1)
@@ -109,13 +119,23 @@ end
 
 new_ps, gs = main(; dct..., epochs=500)
 
+println("ps is (10,2). Should it be (2,10)?")
+println("Am I at a local minimum or close to the global minimum?")
+
 new_ps = collect(new_ps)
-new_ps = reshape(new_ps, 2, :)
-println(typeof(new_ps))
-println("new_ps: $(new_ps[1,:])")
-println("new_ps: $(new_ps[2,:])")
+new_ps = reshape(new_ps, :, 2)
+println("new_ps: $(new_ps[:,1])")
+println("new_ps: $(new_ps[:,2])")
+
+# The coefficients are wrong, although they appear to have the correct magnitudes, but associated
+# wiht the wrong basis functions. 
 
 """
-@. z[1,:] = .3 - 1.5 * x - 2. * x^2 * y + 0.5 * x * y^2 + x^3
-@. z[2,:] =  x^2 - 2. * y^2  + 1.5
+@. z[1,:] = .3 - 1.5 * x - 2. * x^2 * y + 0.5 * x * y^2 + x^3 ==> (.3, -1.5, 0., 0., 0,. 0., 1., -2., 0.5, 0.)
+@. z[2,:] =  x^2 - 2. * y^2  + 1.5   ==> (1.5, 0., 0., 1., 0., -2., 0., 0., 0., 0.)
+"""
+
+"""
+@. z[1,:] = .3  + 2. * x - 3. * y
+@. z[2,:] =  -2. - x + 5. * y
 """

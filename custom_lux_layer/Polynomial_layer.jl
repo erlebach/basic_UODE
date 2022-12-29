@@ -43,8 +43,6 @@ function (l::Polylayer)(x::T, ps, st) where T <: AbstractArray
         x1 = x[1,:]
         x2 = x[2,:]
         N = size(x, 2)
-        #x1 = x[:,1]
-        #x2 = x[:,2]
 
 	    # Should ideally be generated only once and not every time I call the model
         # Coef generated within generated_polynomial. Should not be
@@ -56,17 +54,19 @@ function (l::Polylayer)(x::T, ps, st) where T <: AbstractArray
 
         # Use views to reduce copying? Not worth is for small arrays
         # Must make more efficient!
+        # ????? CORRECT?
         coef1 = view(ps.coeffs, :, 1)  # ps.coeffs is (nb_terms, out_dims)
         coef2 = view(ps.coeffs, :, 2)
         p1 = poly1(coef1, x1, x2)  # should already be of size (1, N)
         p2 = poly2(coef2, x1, x2)
         println("poly layer 2D: 1. sizes p1, p2: ", size(p1), ", ", size(p2)) # should be (1, N)
+        println("poly layer 2D: before reshape, p1 size: ", size(p1))
         p1 = reshape(p1, 1, N)  # should not be required (one row)
         p2 = reshape(p2, 1, N)
-        #println("2. sizes: ", size(p1), ", ", size(p2))
-        p3 = vcat(p1, p2)
-        println("size p3: ", size(p3))
-        return vcat(p1, p2), st  # size: (2,N)
+        println("polylayer 2D: after reshape, p1 size: ", size(p1))
+        p3 = vcat(p1, p2)   # p3: (2, nb_coefs)
+        println("polylayer, size p3: ", size(p3))
+        return vcat(p1, p2), st  # size: (2,nb_coefs)
     else
         println("Poly_layer: l.out_dims > 2 not implemented")
     end
