@@ -2,6 +2,16 @@
 # Get the poly layer working on a simple example, and then perhaps integeate this into 
 # standalone_lux_layer.jl
 #
+# 2022-12-25
+# Test that polynomial layer is working properly. 
+# Create 2D polynomial and test the 2D polynomial layer
+# The network weights are precisely the coefficients required. 
+# The weights should be initialized to zero
+
+# For more complex functions, say rational approximations, I should be able to create
+# specialized layers on a case by case basis. This is not as easy as using Modeling Toolkit, 
+# unless I use macros to create the approximate specilized layer, which could be done. 
+#
 using Revise
 using Zygote
 using ForwardDiff
@@ -27,87 +37,85 @@ Random.seed!(rng, 0)
 
 # I set up the problem incorrectly! Teh polynomials shoudl be functions of (u1, u2), where 
 # u1, u2 are the input to the neural network. 
-function generate_data(N)
+function generate_data_2D(N)
+    # Polynomial: P(x,y) = x^3 + 0.5 x y^2 - 2. y x^2 - (1.5 x) + .3
     x = range(-2.f0, 2.f0, N) |> collect 
-    x1 = view(x, N, 1)  # N x 1
-    p = (0, 1, 2)    # poly(x) = x + x^2
-
-    # To avoid broadcase of p, one must wrap p in a container as below
-    # https://docs.julialang.org/en/v1/manual/arrays/#Broadcasting
-    #y = evalpoly.(x, (p,))  # .+ randn(rng, (1, 128)) * .1f0
-    y1 = evalpoly.(x1, Ref(p)) .+ randn(rng, (N, 1)) * .1f0
-    y2 = evalpoly.(x1, Ref(p)) .+ randn(rng, (N, 1)) * .1f0
-    y = hcat((y1, y2))
-    return x, y
+    y = range(-2.f0, 2.f0, N) |> collect 
+    z = zeros(2, N)
+    # Coefficients: 1 x y x^2 xy y^2 x^3 (x^2 y) (x y^2) y^3
+    #p = (a00=0.3, a10=-1.5, a01=0., a20=0., a11=0., a02=0.5,
+         #a30=1., a21=-2., a12=0., a03=0.)
+    #p = ComponentArray(p)
+    @. z[1,:] = .3 - 1.5 * x - 2. * x^2 * y + 0.5 * x * y^2 + x^3
+    @. z[2,:] =  x^2 - 2. * y^2  + 1.5
+    println("generate_data_2D, z= ",  size(z))
+    # x,y: (1,N), z: (2,N)
+    return x, y, z
 end
 
-# Generate data
 N = 128
-degree = 3 
-x, y = generate_data(N)
-data = y
-println("testing: size x, y: $(size(x)), $(size(y))")
+x_data, y_data, z_data = generate_data_2D(N)
 
-# Generate polynomial function
-# is y[1,:] equivalent to a view?
-# next two lines WORK here!
-#@time poly, coef = generate_polynomial(N, degree, y[1,:], y[2,:]);
-#poly(rand(length(coef))) # evaluate the polynomial at coef
-# For now, the poly itself is generated within the poly layer. But the generated polynomial should be in 
-# an initializer. So I'd like to imoplement initializer functionality. 
-plot(reshape(x, :), y[1,:])
-plot!(reshape(x, :), y[2,:])
-
-model = Polylayer(; out_dims=2, degree=4, init_weight=Lux.rand32)
+model = Polylayer(; out_dims=2, degree=3, init_weight=Lux.zeros32)
 ps, st = Lux.setup(rng, model)
+#ps = Lux.initialparameters(rng, model)
 ps = ComponentArray(ps)
-opt = Lux.Adam(0.01f0)
+opt = Lux.Adam(0.1f0)
 # My cost function is not decreasing. Something is clearly wrong. 
 st_opt = Optimisers.setup(opt, ps)
-dct = Dict(:rng => rng, :model => model, :ps => ps, :st => st, :opt => opt, :st_opt => st_opt)
+dct = Dict(:rng => rng, :model => model, :ps => ps, :st => st, 
+           :opt => opt, :st_opt => st_opt, :N => N, 
+           :x_data => x_data, :y_data => y_data, :z_data => z_data)
 
-function loss_function(model, ps, st, data)
-    y_pred, _ = model(data, ps, st)  # Model should return size (model.out_dims, N). Update global st
-    mse_loss = mean(abs2, y_pred - data)     # mutated data?
+xy = hcat(x_data, y_data) |> transpose  # (2, N)
+
+plot(z_data[1,:])
+plot!(z_data[2,:])
+# The model should return a vector of size 2 x 128. 
+# The second value returned is the state, which is empty 
+
+# model prediction is zero since all coefficients are initialized to zero
+zz = model(xy, ps, st)[1]
+
+function loss_function(model, ps, st, x_data, y_data, z_data, epoch)
+    xy = hcat(x_data, y_data)   |> transpose# 
+    z_pred, _ = model(xy, ps, st)  # Model should return size (model.out_dims, N). Update global st
+    mse_loss = mean(abs2, z_pred - z_data)     # mutated data?
     # induce sparsity
-    lambda = 1.
+    lambda = .001
     mse_loss = mse_loss + lambda * norm(ps, 1)
-    println("mse_loss: ", mse_loss)
+    if (epoch % 10 == 0)
+        # println("mse_loss[$(epoch)]: $(mse_loss), ps: $(ps)")
+        println("mse_loss[$(epoch)]: $(mse_loss)")
+    end
     return mse_loss, ()   # what is ()? 
 end
 
-# Finally the training loop.
-function main(; model, ps, st, st_opt, data=nothing, epochs=100, kwargs...)
+#----------------------------------
+function main(; model, ps, st, st_opt, x_data, y_data, z_data, epochs=200, N=128, kwargs...)
     # needed because st_opt on left-hand side further down, and a 
     # variable can only have a single declaration in a function
-    data = rand(128, model.out_dims)  # shadows the argument
-
     # Next: need a call function. Perhaps use Optimization.jl package? 
-    
     gs = 0
     for epoch in 1:epochs
-        gs = Zygote.gradient((coef, data) -> loss_function(model, coef, st, data)[1], ps, data)[1]
-        st_opt, ps = Optimisers.update(st_opt, ps, gs)  # ERROR
+        gs = Zygote.gradient(
+                (coef, data) -> loss_function(model, coef, st, x_data, y_data, data, epoch)[1], 
+                ps, z_data
+            )[1]
+        st_opt, ps = Optimisers.update(st_opt, ps, gs)  
     end
     return ps, gs
 end
 
-# I wasted three days on this. And it does not appear to work. Why not? 
+new_ps, gs = main(; dct..., epochs=500)
 
-new_ps, gs = main(; dct..., data=data, epochs=1000)
-ps.coeffs
-new_ps.coeffs
-println("original _ps: ", ps.coeffs)
-println("new_ps: ", new_ps)
-size(new_ps)
+new_ps = collect(new_ps)
+new_ps = reshape(new_ps, 2, :)
+println(typeof(new_ps))
+println("new_ps: $(new_ps[1,:])")
+println("new_ps: $(new_ps[2,:])")
 
-# the data is x = x + x^2. Therefore the correct coefficients should be: 
 """
-I = (0, 1, 0, 2, 1, 0, 3, 2, 1, 0)
-J = (0, 0, 1, 0, 1, 2, 0, 1, 2, 3)
+@. z[1,:] = .3 - 1.5 * x - 2. * x^2 * y + 0.5 * x * y^2 + x^3
+@. z[2,:] =  x^2 - 2. * y^2  + 1.5
 """
-
-# The functions are approx the same, so should the coefficients. But the're not. 
-# Theoretically, the nonzero coefficients should be indexes: 
-#   for the x equation: index 2 and 4 
-#   for the y equation: index 3 and 5 (since the equations are decoupled)

@@ -7,25 +7,34 @@ function generate_polynomial_2D(degree)
     #I = [i[1] for i in IJ]
     #J = [i[2] for i in IJ]
 
-    if degree == 2
-        IJ = [(0,0), (1,0), (2,0), (0,1), (0,2), (1,1)]
-        I = (0,1,2,0,0,1)
-        J = (0,0,0,1,2,1)
+    if degree == 1
+        I = (0,1,0)
+        J = (0,0,1)
+    elseif degree == 2
+        #IJ = [(0,0), (1,0), (0,1), (2,0), (1,1), (0,2)]
+        I = (0,1,0,2,1,0)
+        J = (0,0,1,0,1,2)
     elseif degree == 3
-        IJ = [(0,0), (1,0), (0,1), (2,0), (1,1), (0,2), (3,0), (2,1), (1,2), (0,3)]
+        #IJ = [(0,0), (1,0), (0,1), (2,0), (1,1), (0,2), (3,0), (2,1), (1,2), (0,3)]
         I = (0, 1, 0, 2, 1, 0, 3, 2, 1, 0)
         J = (0, 0, 1, 0, 1, 2, 0, 1, 2, 3)
     elseif degree == 4
-        IJ = [(0,0), (1,0), (0,1), (2,0), (1,1), (0,2), (3,0), (2,1), (1,2), (0,3), (4,0), (3,1), (2,2), (1,3), (0,4)]
+        #IJ = [(0,0), (1,0), (0,1), (2,0), (1,1), (0,2), (3,0), (2,1), (1,2), (0,3), (4,0), (3,1), (2,2), (1,3), (0,4)]
         I = (0, 1, 0, 2, 1, 0, 3, 2, 1, 0, 4, 3, 2, 1, 0)
         J = (0, 0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4)
+    elseif degree == 5
+        I = (0, 1, 0, 2, 1, 0, 3, 2, 1, 0, 4, 3, 2, 1, 0, 5, 4, 3, 2, 1, 0)
+        J = (0, 0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5)
     else
-        println("Degree greater than 4 not implemented (2D degree: $(degree))")
+        println("Degree greater than 5 not implemented (2D degree: $(degree))")
     end
 
     # Construct a polynomial in x and y, according to the indices listed in I
-    # Returns a function (coef, x, y) -> Array{T, N, out_dims)
+    # Returns a function (coef, x, y) -> Array{T, N, out_dims) wehere T
+    # Perhaps I could use the modeling toolkit to handle this?
+    # Poly(coef, x, y) returns a Vector{T} where T is eltype(x)
      Poly(coef, x, y) = @tullio poly[i] := coef[j] * x[i]^I[j] * y[i]^J[j] grad=Dual nograd=x nograd=y nograd=I nograd=J
+     
      return Poly
 end
 
@@ -36,17 +45,18 @@ function generate_polynomial_1D(degree)
     #I = [i[1] for i in IJ]
     #J = [i[2] for i in IJ]
 
-    println("inside generate polynomial(x)")
-    if degree == 2
+    if degree == 1
+        I = (0,1)
+    elseif degree == 2
         I = (0,1,2)
     elseif degree == 3
-        println("degree is 3")
         I = (0, 1, 2, 3)
     elseif degree == 4
         I = (0, 1, 2, 3, 4)
+    elseif degree == 5
+        I = (0, 1, 2, 3, 4, 5)
     else
-        println("inside else")
-        println("Degree greater than 4 not implemented (1D degree: $(degree))")
+        println("Degree greater than 5 not implemented (1D degree: $(degree))")
     end
 
     # Construct a polynomial in x and y, according to the indices listed in I

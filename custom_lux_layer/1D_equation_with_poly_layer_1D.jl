@@ -1,13 +1,15 @@
 # 2022-12-25
-# Get the poly layer working on a simple example, and then perhaps integeate this into 
-# standalone_lux_layer.jl
-# Test that polynomail layer is working properly. 
-# The network weights are precisely the coefficients required. 
-# The weights should be initialized to zero
+"""
+Solve a 1D equation of one variable of the form
+  dy/dt = -y + .1 y^2 - .3 y^4
+using UODE in the form: 
+  dy/dt = -y + NN(y)
+where NN is a neural network with one input and one output.
+Starting point: testing_lux_layer_test_1D.jl
+File name: 1D_equation_with_poly_layer_1D.jl
 
-# For more complex functions, say rational approximations, I should be able to create
-# specilialized layers on a case by case basis. This is not as easy as using Modeling Toolkit, 
-# unless I use macros to create the approximate specilized layer, which could be done.. 
+This will be followed by a two ODEs in two variables. 
+"""
 
 using Revise
 using Zygote
@@ -117,7 +119,7 @@ end
 
 # I wasted three days on this. And it does not appear to work. Why not? 
 
-new_ps, gs = main(; dct..., epochs=500)
+new_ps, gs = main(; dct..., data=data, epochs=500)
 ps.coeffs
 new_ps.coeffs
 println("original _ps: ", ps.coeffs)
