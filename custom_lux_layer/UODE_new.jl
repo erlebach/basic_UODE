@@ -1,5 +1,5 @@
 using Lux
-using DiffEqFlux
+#using DiffEqFlux
 using DifferentialEquations
 using Optimization
 using OptimizationOptimJL
@@ -24,7 +24,6 @@ dudt2 = Lux.Chain(x -> x.^3,
                   Lux.Dense(2, 50, tanh),
                   Lux.Dense(50, 2))
 p, st = Lux.setup(rng, dudt2)
-# NeuralODE does not exist, perhaps it does in DiffEqFlux
 prob_neuralode = NeuralODE(dudt2, tspan, Tsit5(), saveat = tsteps)
 
 function predict_neuralode(p)
