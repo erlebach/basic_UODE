@@ -56,7 +56,7 @@ t = solution.t  # solution steps
 # Add noise in terms of the mean
 X = Array(solution)
 x̄ = mean(X, dims=2)  # mean along the 2nd dimension
-noise_magnitude = 2.e-2
+noise_magnitude = 5.e-3
 Xn = X .+ (noise_magnitude*x̄) .* randn(eltype(X), size(X))
 plot(t, Xn[1,:])
 plot!(t, Xn[2,:])
@@ -82,7 +82,7 @@ function Lotka_Volterra_NN!(du, u, p_NN, t, p_LV, model, st)
     α, β, γ, δ = p_LV
     # model returns two polynomials
     û = model(u, p_NN, st)[1] # model also return state st. Keep 1st element. 
-    du[1] = -α * u[1] + û[1]   # -α*u[1] + poly(acting on single point). Where is the network trained? 
+    du[1] =  α * u[1] + û[1]   # -α*u[1] + poly(acting on single point). Where is the network trained? 
     du[2] = -δ * u[2] + û[2]
     return du
 end
@@ -96,8 +96,9 @@ prob_nn = ODEProblem(Lotka_Volterra_NN_closure, Xn[:, 1], tspan, ps_NN)
 # Simple L2 loss
 function loss_neuralode(θ, hyperparam, ps)
     X̂ = predict_neuralode(θ)  # should return solution
-    λ = 0.01  # Induduce sparsity with L1 norm
-    loss = sum(abs2, Xn .- X̂) + λ * norm(ps, 1) / length(ps)
+    λ = 0.001  # Induduce sparsity with L1 norm
+    loss = sum(abs2, Xn .- X̂) + λ * norm(ps, 1) #/ length(ps)
+    println("loss: ", loss)
     return loss
 end
 #-------------------------------------------------------------------------
@@ -118,27 +119,37 @@ function predict_neuralode(θ, X₀=Xn[:,1], T=t)
     _prob = remake(prob_nn; u0=X₀, tspan= (T[1], T[end]), p=θ)
     solution = solve(_prob, Vern7(), saveat= T,
         abstol=1.e-6, reltol=1.e-6, sensealg=ForwardDiffSensitivity()
+        # is `sensealg` necessary?
     )
 
-     solution = Array(solution)
+    solution = Array(solution)
     return solution 
 end
 
 losses = Float64[]
+
 callback = function(p, loss) #, pred; doplot = false)
     push!(losses, loss)
-    if length(losses) % 10 == 0
+    if length(losses) % 50 == 0
       println("Current loss after $(length(losses)) iterations: $(losses[end])")
     end
     return false
 end
 
-adtype = Optimization.AutoZygote()
+adtype = Optimization.AutoZygote() # best if many parameters
 optf = Optimization.OptimizationFunction((x, p)->loss_neuralode(x, p, ps_NN), adtype)
 # Componentarray is a projection operator
-optprob = OptimizationProblem(optf, ps_NN)
+optprob = Optimization.OptimizationProblem(optf, ps_NN)
 # The parameters are not changing. 
-res1 = Optimization.solve(optprob, Adam(0.01); callback=callback, maxiters=100)
-#res1 = Optimization.solve(optprob, OptimizationOptimisers.Adam(0.1), maxiters=5)
+# res1 = Optimization.solve(optprob, Descent(0.001); callback=callback, maxiters=10)
+#res1 = Optimization.solve(optprob, OptimizationOptimisers.ADAM(), maxiters=500)
+res1 = Optimization.solve(optprob, OptimizationOptimisers.Adam(0.01), callback=callback, maxiters=50000)
+
+#optprob2 = Optimization.OptimizationProblem(optf, res1.u)
+#res2 = Optimization.solve(optprob2, Optim.LBFGS(), maxiters=500)
+#p_trained = res2.u
+#println("Final training loss after $(length(losses)) iterations: $(losses[end])")
+# Rename the best candidate
 
 #-------------------------------------------------------------------------
+
